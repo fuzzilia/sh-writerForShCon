@@ -22,5 +22,9 @@ pyinstaller writerForShCon.py --onefile
 ```
 ※Macの場合はUNIX実行ファイルになるため、同階層に「adafruit-nrfutil」を配置する必要有。
 
-## 書き込みライブラリ引用元
+
+### 書き込み実行ファイル引用元
 - https://github.com/adafruit/Adafruit_nRF52_nrfutil
+
+### 書き込み実行ファイル引用元のライセンス
+- https://github.com/adafruit/Adafruit_nRF52_nrfutil/blob/master/license.txt

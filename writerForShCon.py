@@ -1,8 +1,4 @@
 #-*- coding:utf-8 -*-
-#
-# used adafruit-nrfutil.exe and adafruit-nrfutil from URL:
-# https://github.com/adafruit/Adafruit_nRF52_nrfutil
-#
 import os, sys, serial, threading, subprocess
 import serial.tools.list_ports
 from time import sleep
@@ -18,10 +14,13 @@ class WriterForShCon(QDialog):
     TITLE = "WriterForShCon v{}".format(VERSION)
     port_flg = True
 
+
     def __init__(self, parent=None):
         """ コンストラクタ
         """
         super(WriterForShCon, self).__init__(parent)
+
+        print("このコンソール画面はアプリを立ち上げている間は閉じないでください。")
 
         # アイコン画像を設定
         if sys.platform.startswith('win'):
@@ -92,8 +91,6 @@ class WriterForShCon(QDialog):
         self.wp = WritingProcess()
         self.wp.writing_thread.connect(self.print_log)
         self.wp.finished.connect(self.show_result)
-
-        print("このコンソール画面はアプリを立ち上げている間は閉じないでください。")
 
 
     def temp_path(self, relative_path):
@@ -265,18 +262,13 @@ class WritingProcess(QThread):
     def run(self):
         """ 書き込み処理を実行する関数
         """
+        # 書き込みモードに切り替え
+        self.change_write_mode()
         # 書き込み実行
         self.write_sketch()
 
-
-    def write_sketch(self):
-        """ ボードに書き込むコマンドを実行
-        """
-        self.error = None
-        error_flg = False
-        encording = "shift-jis"
-
-        # DFUモードへ切り替え        
+    def change_write_mode(self):
+        # モードへ切り替え        
         port = serial.Serial(self.target_port, 115200)
         try:
             port.baudrate = 1200
@@ -285,45 +277,53 @@ class WritingProcess(QThread):
             port.setDTR(False)
             sleep(0.1)
         except Exception as e:
-            error_flg = True
             self.error = e
         finally:
             port.close()
             sleep(1)
 
-        if not error_flg:
-            command = self.CMD_WRITE_STR
 
-            # 接続されているポートのリストを取得
-            port_list = [port_info.name for port_info in serial.tools.list_ports.comports()]
+    def write_sketch(self):
+        """ ボードに書き込むコマンドを実行
+        """
+        self.error = None
+        error_flg = False
+        encording = "shift-jis"
+        command = self.CMD_WRITE_STR
 
-            # MacOSの場合はポート頭に/dev/を追加、コマンド変更、エンコードをutf-8にする
-            if sys.platform.startswith('darwin'):
-                port_list = ["/dev/" + p for p in port_list]
-                dir = os.path.abspath(os.path.dirname(sys.argv[0]))
-                command = dir + self.CMD_WRITE_MAC_STR
-                encording = "utf-8"
+        # 接続されているポートのリストを取得
+        port_list = [port_info.name for port_info in serial.tools.list_ports.comports()]
 
-            print(port_list[-1])
+        # MacOSの場合はポート頭に/dev/を追加、コマンド変更、エンコードをutf-8にする
+        if sys.platform.startswith('darwin'):
+            port_list = ["/dev/" + p for p in port_list]
+            dir = os.path.abspath(os.path.dirname(sys.argv[0]))
+            command = dir + self.CMD_WRITE_MAC_STR
+            encording = "utf-8"
 
-            # 書き込みコマンド実行(対象ポートはポートリストの最後を使う)
-            for line in self.run_cmd_get_line(cmd=command.format("\"" + self.target_zip_path + "\"", port_list[-1]), encoding_str=encording):
-                self.writing_thread.emit(line[:-1])
+        print(port_list[-1])
 
-                # TracebackかFaildの文字があればエラーとみなして、エラーに追記
-                if 'Traceback' in str(line) or 'Faild' in str(line):
-                    error_flg = True
-                    self.error = ""
+        # 書き込みコマンド実行(対象ポートはポートリストの最後を使う)
+        for line in self.run_cmd_get_line(cmd=command.format("\"" + self.target_zip_path + "\"", port_list[-1]), encoding_str=encording):
+            self.writing_thread.emit(line[:-1])
 
-                if error_flg:
-                    self.error = self.error + str(line)
+            # TracebackかFaildの文字があればエラーとみなして、エラーに追記
+            if 'Traceback' in str(line) or 'Faild' in str(line):
+                error_flg = True
+                self.error = ""
+
+            if error_flg:
+                self.error = self.error + str(line)
 
 
     def run_cmd_get_line(self, cmd, encoding_str):
         """ コマンド実行中の標準出力を非同期で取得する関数
-        cmd: str 実行するコマンド
-        rtype: generator
-        return: 標準出力 (行毎)
+            Args:
+                cmd (str): 実行するコマンド文字列
+                encoding_str (str): エンコード文字列
+            
+            Returns:
+                標準出力 (行毎)
         """
         proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding=encoding_str)
 
@@ -333,6 +333,11 @@ class WritingProcess(QThread):
                 yield line
             if not line and proc.poll() is not None:
                 break
+
+        # コマンドの結果がエラーの場合の処理
+        if not proc.returncode == 0:
+            self.error = "書き込み実行コマンドが失敗しました。"
+
 
 if __name__ == '__main__':
     # Qtアプリケーションの作成
