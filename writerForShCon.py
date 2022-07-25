@@ -262,13 +262,20 @@ class WritingProcess(QThread):
     def run(self):
         """ 書き込み処理を実行する関数
         """
+        self.error = None
+
         # 書き込みモードに切り替え
         self.change_write_mode()
-        # 書き込み実行
-        self.write_sketch()
+        sleep(1)
+
+        if self.error is None:
+            # 書き込み実行
+            self.write_sketch()
+
 
     def change_write_mode(self):
-        # モードへ切り替え        
+        """ 書き込みードへ切り替えを行う関数
+        """
         port = serial.Serial(self.target_port, 115200)
         try:
             port.baudrate = 1200
@@ -280,13 +287,11 @@ class WritingProcess(QThread):
             self.error = e
         finally:
             port.close()
-            sleep(1)
 
 
     def write_sketch(self):
         """ ボードに書き込むコマンドを実行
         """
-        self.error = None
         error_flg = False
         encording = "shift-jis"
         command = self.CMD_WRITE_STR

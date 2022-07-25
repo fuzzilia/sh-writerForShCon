@@ -15,6 +15,7 @@
 ```shell
 pyinstaller writerForShCon.py --name writerForShCon.exe --icon=icon.ico --add-data "icon.ico;./" --add-data "adafruit-nrfutil.exe;./" --onefile
 ```
+※Windowsの場合はadafruit-nrfutil.exeを同階層に配置してからビルドコマンドを実行。
 
 ### ・Mac
 ```shell
