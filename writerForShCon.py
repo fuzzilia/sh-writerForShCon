@@ -340,7 +340,7 @@ class WritingProcess(QThread):
                 break
 
         # コマンドの結果がエラーの場合の処理
-        if not proc.returncode == 0:
+        if (self.error is None) and (not proc.returncode == 0):
             self.error = "書き込み実行コマンドが失敗しました。"
 
 
