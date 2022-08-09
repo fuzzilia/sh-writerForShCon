@@ -171,7 +171,7 @@ class WriterForShCon(QDialog):
         if self.wp.error is None:
             QMessageBox.information(self, "正常終了", "書き込みが正常終了しました。")
         else:
-            QMessageBox.warning(self, "注意", "書き込みに失敗しました。\n\n" + self.wp.error)
+            QMessageBox.warning(self, "注意", "書き込みに失敗しました。\nポートやzipファイルが間違っていないか確認して再度実行してください。\n\n" + self.wp.error)
 
         # プログレスバーの停止
         self.pb.setMinimum(0)
@@ -203,7 +203,7 @@ class WriterForShCon(QDialog):
                 # MacOSの場合はポート頭に/dev/を追加
                 if sys.platform.startswith('darwin'):
                     result = ["/dev/" + p for p in result]
-                
+
                 result.insert(0, "")
 
                 # 現在の選択値文字列を取得してプルダウンリストを更新
@@ -263,14 +263,45 @@ class WritingProcess(QThread):
         """ 書き込み処理を実行する関数
         """
         self.error = None
+        write_port = [self.target_port]
 
         # 書き込みモードに切り替え
         self.change_write_mode()
-        sleep(1)
+        self.writing_thread.emit("changed write mode.")
+
+        # 書き込みモード直後のポートリストを取得
+        after_port_list = self.get_port_list()
+
+        counter = 0
+        while True:
+            port_list = self.get_port_list()
+
+            # ポートが増えていた場合はループを抜け出す
+            if len(after_port_list) < len(port_list):
+                write_port = list(set(after_port_list) ^ set(port_list))
+                break
+            elif counter > 25:
+                break
+
+            counter = counter + 1
+            sleep(0.25)
 
         if self.error is None:
             # 書き込み実行
-            self.write_sketch()
+            self.write_sketch(write_port[0])
+
+
+    def get_port_list(self):
+        """ ポートのリストを取得する関数
+        """
+        # ポートリストを取得
+        port_list = [port_info.name for port_info in serial.tools.list_ports.comports()]
+
+        # MacOSの場合はポート頭に/dev/を追加
+        if sys.platform.startswith('darwin'):
+            port_list = ["/dev/" + p for p in port_list]
+
+        return port_list
 
 
     def change_write_mode(self):
@@ -289,27 +320,25 @@ class WritingProcess(QThread):
             port.close()
 
 
-    def write_sketch(self):
+    def write_sketch(self, write_port):
         """ ボードに書き込むコマンドを実行
+            Args:
+                write_port (str): 書き込み対象ポート文字列
         """
         error_flg = False
         encording = "shift-jis"
         command = self.CMD_WRITE_STR
 
-        # 接続されているポートのリストを取得
-        port_list = [port_info.name for port_info in serial.tools.list_ports.comports()]
-
-        # MacOSの場合はポート頭に/dev/を追加、コマンド変更、エンコードをutf-8にする
+        # MacOSの場合はコマンド変更、エンコードをutf-8にする
         if sys.platform.startswith('darwin'):
-            port_list = ["/dev/" + p for p in port_list]
             dir = os.path.abspath(os.path.dirname(sys.argv[0]))
             command = dir + self.CMD_WRITE_MAC_STR
             encording = "utf-8"
 
-        print(port_list[-1])
+        self.writing_thread.emit("target port: {}".format(write_port))
 
         # 書き込みコマンド実行(対象ポートはポートリストの最後を使う)
-        for line in self.run_cmd_get_line(cmd=command.format("\"" + self.target_zip_path + "\"", port_list[-1]), encoding_str=encording):
+        for line in self.run_cmd_get_line(cmd=command.format("\"" + self.target_zip_path + "\"", write_port), encoding_str=encording):
             self.writing_thread.emit(line[:-1])
 
             # TracebackかFaildの文字があればエラーとみなして、エラーに追記
