@@ -305,7 +305,7 @@ class WritingProcess(QThread):
 
 
     def change_write_mode(self):
-        """ 書き込みードへ切り替えを行う関数
+        """ 書き込みモードへ切り替えを行う関数
         """
         port = serial.Serial(self.target_port, 115200)
         try:
