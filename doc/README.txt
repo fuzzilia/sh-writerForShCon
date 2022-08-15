@@ -29,4 +29,5 @@ https://github.com/adafruit/Adafruit_nRF52_nrfutil
 https://github.com/adafruit/Adafruit_nRF52_nrfutil/blob/master/license.txt
 
 [更新履歴]
-
+v1.0
+・First Release
